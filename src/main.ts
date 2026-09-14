@@ -1,4 +1,8 @@
 import { createChart, type Slot } from "./chart";
+// Register the accessibility module so Highcharts doesn't warn in the console.
+// Loaded here (the browser entry) rather than in chart.ts so unit tests stay
+// free of the DOM-dependent module. Runs after ./chart pulls in Highcharts.
+import "highcharts/modules/accessibility.js";
 
 /** Days 10.06–14.06.2026 as UTC timestamps. */
 const days = [

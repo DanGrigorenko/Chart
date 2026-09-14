@@ -45,6 +45,22 @@ describe("buildOptions", () => {
     expect(options.credits?.enabled).toBe(false);
   });
 
+  it("shared tooltip lists series in reference order: Cost, CPA, ROI confirmed, Conversions", () => {
+    const options = buildOptions(input);
+    const series = options.series ?? [];
+    const formatter = options.tooltip!.formatter!;
+    // Feed the points in rendering (series) order — area, spline, line, column —
+    // which is NOT the reference tooltip order, so the formatter must reorder.
+    const points = series.map((s) => {
+      const so = s as { name: string; color: string; custom: unknown };
+      return { series: { name: so.name, options: { custom: so.custom } }, color: so.color, y: 1 };
+    });
+    const html = (formatter as (this: unknown) => string).call({ x: 0, points });
+    const order = ["Cost", "CPA", "ROI confirmed", "Conversions"].map((n) => html.indexOf(n));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
   it("carries series names and defaults decimals to 2, honouring overrides", () => {
     const options = buildOptions(input);
     const tooltip = options.tooltip!;

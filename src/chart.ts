@@ -49,27 +49,36 @@ type SlotConfig = {
   slot: Slot;
   type: "area" | "spline" | "line" | "column";
   fallbackColor: string;
+  /** Row position in the shared tooltip (area, bar, spline, line — see issue #2). */
+  tooltipOrder: number;
 };
+
+/** Hollow-marker fill so hovered points show a light centre, per the reference. */
+const MARKER_CENTER = "#FFFFFF";
 
 /**
  * Build the pure Highcharts options for the four-series chart. Kept separate
  * from `createChart` so it can be unit-tested without a DOM.
  */
 export function buildOptions(input: ChartInput): Highcharts.Options {
+  // Slots keep their rendering order (area, spline, line, column) for z-order and
+  // yAxis indexing; `tooltipOrder` drives the reference tooltip order (area, bar,
+  // spline, line = Cost, CPA, ROI confirmed, Conversions).
   const configs: SlotConfig[] = [
-    { slot: input.area, type: "area", fallbackColor: COLORS.area },
-    { slot: input.spline, type: "spline", fallbackColor: COLORS.spline },
-    { slot: input.line, type: "line", fallbackColor: COLORS.line },
-    { slot: input.bar, type: "column", fallbackColor: COLORS.bar },
+    { slot: input.area, type: "area", fallbackColor: COLORS.area, tooltipOrder: 0 },
+    { slot: input.spline, type: "spline", fallbackColor: COLORS.spline, tooltipOrder: 2 },
+    { slot: input.line, type: "line", fallbackColor: COLORS.line, tooltipOrder: 3 },
+    { slot: input.bar, type: "column", fallbackColor: COLORS.bar, tooltipOrder: 1 },
   ];
 
   // Independent scale: one hidden yAxis per slot so heights are not comparable.
   const yAxis: Highcharts.YAxisOptions[] = configs.map((cfg) => {
     const axis: Highcharts.YAxisOptions = { visible: false };
     if (cfg.type === "column") {
-      // Keep the bars a few px tall at the bottom by giving the axis a big max.
+      // Keep the bars tiny (~3-5px) nubs at the bottom by giving the axis a huge
+      // max relative to the data, so even the tallest bar is a few px high.
       const maxValue = cfg.slot.data.reduce((m, [, v]) => Math.max(m, v), 0);
-      axis.max = maxValue * 10;
+      axis.max = maxValue * 40;
       axis.min = 0;
     }
     return axis;
@@ -84,7 +93,7 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       color,
       yAxis: i,
       data: cfg.slot.data,
-      custom: { decimals },
+      custom: { decimals, tooltipOrder: cfg.tooltipOrder },
     };
 
     switch (cfg.type) {
@@ -101,25 +110,45 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
         return {
           ...base,
           type: "spline",
-          lineWidth: 3,
-          marker: { enabled: false, symbol: "circle" },
-          states: { hover: { lineWidth: 5 } },
+          // Thin at rest, noticeably thicker when the series is hovered (issue #2).
+          lineWidth: 1.5,
+          // Hover reveals a small hollow dot (light centre) on the hovered point.
+          marker: {
+            enabled: false,
+            symbol: "circle",
+            radius: 3,
+            states: {
+              hover: { enabled: true, radius: 4, fillColor: MARKER_CENTER, lineColor: color, lineWidth: 2 },
+            },
+          },
+          states: { hover: { lineWidth: 4 } },
         } satisfies Highcharts.SeriesSplineOptions;
       case "line":
         return {
           ...base,
           type: "line",
           lineWidth: 1,
-          marker: { enabled: true, symbol: "square", radius: 4 },
+          // Square markers; hover swaps to a light centre (hollow square).
+          marker: {
+            enabled: true,
+            symbol: "square",
+            radius: 4,
+            fillColor: color,
+            lineColor: color,
+            lineWidth: 1,
+            states: {
+              hover: { fillColor: MARKER_CENTER, lineColor: color, lineWidth: 2, radius: 5 },
+            },
+          },
         } satisfies Highcharts.SeriesLineOptions;
       case "column":
         return {
           ...base,
           type: "column",
-          borderRadius: 3,
+          // Thin (~40px) rounded nubs at the bottom of the plot, not full-step bars.
+          borderRadius: 2,
           borderWidth: 0,
-          pointPadding: 0.1,
-          groupPadding: 0.05,
+          pointWidth: 40,
         } satisfies Highcharts.SeriesColumnOptions;
     }
   });
@@ -138,7 +167,8 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
     yAxis,
     plotOptions: {
       series: {
-        states: { hover: { halo: { size: 6 } } },
+        // Large translucent halo around hovered points, as in the reference.
+        states: { hover: { halo: { size: 16, opacity: 0.25 } } },
         animation: false,
       },
     },
@@ -152,17 +182,21 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       shadow: true,
       padding: 12,
       formatter: function (this: SharedTooltipContext): string {
-        const points = this.points ?? [];
-        const date = `<div style="color:${COLORS.tooltipDate};margin-bottom:4px">${formatDate(this.x)}</div>`;
+        const custom = (p: Highcharts.Point): { decimals?: number; tooltipOrder?: number } =>
+          (p.series.options as { custom?: { decimals?: number; tooltipOrder?: number } }).custom ?? {};
+        // Reorder rows to the reference order (area, bar, spline, line); Highcharts
+        // hands us the points in rendering (series) order.
+        const points = [...(this.points ?? [])].sort(
+          (a, b) => (custom(a).tooltipOrder ?? 0) - (custom(b).tooltipOrder ?? 0),
+        );
+        const date = `<div style="color:${COLORS.tooltipDate};font-size:13px;margin-bottom:6px">${formatDate(this.x)}</div>`;
         const rows = points
           .map((p) => {
-            const decimals =
-              (p.series.options as { custom?: { decimals?: number } }).custom?.decimals ??
-              DEFAULT_DECIMALS;
+            const decimals = custom(p).decimals ?? DEFAULT_DECIMALS;
             const value = Highcharts.numberFormat(p.y as number, decimals);
             return (
-              `<div style="display:flex;align-items:center;gap:6px">` +
-              `<span style="color:${p.color};font-size:14px">●</span>` +
+              `<div style="display:flex;align-items:center;gap:8px;font-size:15px;line-height:20px">` +
+              `<span style="width:13px;height:13px;border-radius:50%;background:${p.color};display:inline-block;flex:0 0 auto"></span>` +
               `<span>${p.series.name}: <b>${value}</b></span>` +
               `</div>`
             );
