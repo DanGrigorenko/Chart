@@ -23,7 +23,8 @@ const COLORS = {
   line: "#B400F7",
   bar: "#3A6AF6",
   plotBorder: "#D5C5C6",
-  tooltipDate: "#8A8A8A",
+  tooltipDate: "#686667",
+  tooltipBorder: "#E3E3E3",
 } as const;
 
 const DEFAULT_DECIMALS = 2;
@@ -109,8 +110,12 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
           type: "area",
           fillOpacity: 0.55,
           lineWidth: 0,
-          marker: { enabled: false, states: { hover: { enabled: false } } },
-          enableMouseTracking: true,
+          // Hover reveals a small light dot with the yellow halo, as in the reference.
+          marker: {
+            enabled: false,
+            symbol: "circle",
+            states: { hover: { enabled: true, radius: 3, fillColor: MARKER_CENTER, lineColor: color, lineWidth: 1 } },
+          },
         } satisfies Highcharts.SeriesAreaOptions;
       case "spline":
         return {
@@ -165,6 +170,7 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       plotBorderColor: COLORS.plotBorder,
       plotBorderWidth: 1,
       spacing: [8, 8, 8, 8],
+      style: { cursor: "pointer" },
     },
     title: { text: "" },
     credits: { enabled: false },
@@ -183,9 +189,10 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       useHTML: true,
       followPointer: true,
       backgroundColor: "#FFFFFF",
-      borderWidth: 0,
+      borderWidth: 1,
+      borderColor: COLORS.tooltipBorder,
       borderRadius: 8,
-      shadow: true,
+      shadow: { color: "rgba(0,0,0,0.25)", offsetX: 0, offsetY: 2, width: 6 },
       padding: 12,
       formatter: function (this: SharedTooltipContext): string {
         const custom = (p: Highcharts.Point): SeriesCustom =>
