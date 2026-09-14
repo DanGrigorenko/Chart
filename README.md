@@ -5,6 +5,8 @@ Each of the four fixed slots is drawn with a different display type — `area`,
 `spline`, `line` and `bar` — over a shared time axis, matching the reference in
 `docs/reference/`.
 
+![Chart demo with the shared tooltip open](docs/screenshot.png)
+
 ## Getting started
 
 ```bash
@@ -57,4 +59,13 @@ npm run typecheck  # tsc --noEmit
 npm test           # run vitest
 ```
 
-Run the coding-agent harness with `npm run sandcastle`.
+## Project layout
+
+- `src/chart.ts` — `createChart` / `buildOptions`, the whole chart
+- `src/main.ts`, `index.html` — demo with the reference data
+- `docs/reference/` — frames from the reference screencast
+- `CONTEXT.md`, `docs/adr/` — glossary and design decisions
+
+The chart was built by AI coding agents from GitHub issues: `.sandcastle/` is the
+agent harness (`npm run sandcastle`), `docs/agents/` and `CLAUDE.md` are their
+instructions. None of it is needed to run the chart.
