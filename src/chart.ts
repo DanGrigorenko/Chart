@@ -34,6 +34,12 @@ type SharedTooltipContext = {
   points?: Highcharts.Point[];
 };
 
+/** Per-series data we stash on `series.custom` and read back in the tooltip. */
+type SeriesCustom = {
+  decimals?: number;
+  tooltipOrder?: number;
+};
+
 /** Pad a two-digit calendar field. */
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -93,7 +99,7 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       color,
       yAxis: i,
       data: cfg.slot.data,
-      custom: { decimals, tooltipOrder: cfg.tooltipOrder },
+      custom: { decimals, tooltipOrder: cfg.tooltipOrder } satisfies SeriesCustom,
     };
 
     switch (cfg.type) {
@@ -182,8 +188,8 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
       shadow: true,
       padding: 12,
       formatter: function (this: SharedTooltipContext): string {
-        const custom = (p: Highcharts.Point): { decimals?: number; tooltipOrder?: number } =>
-          (p.series.options as { custom?: { decimals?: number; tooltipOrder?: number } }).custom ?? {};
+        const custom = (p: Highcharts.Point): SeriesCustom =>
+          (p.series.options as { custom?: SeriesCustom }).custom ?? {};
         // Reorder rows to the reference order (area, bar, spline, line); Highcharts
         // hands us the points in rendering (series) order.
         const points = [...(this.points ?? [])].sort(
