@@ -78,8 +78,8 @@ export function buildOptions(input: ChartInput): Highcharts.Options {
   const series: Highcharts.SeriesOptionsType[] = configs.map((cfg, i) => {
     const color = cfg.slot.color ?? cfg.fallbackColor;
     const decimals = cfg.slot.decimals ?? DEFAULT_DECIMALS;
+    // `type` is set per-branch below (each literal drives the `satisfies` narrowing).
     const base = {
-      type: cfg.type,
       name: cfg.slot.name,
       color,
       yAxis: i,
